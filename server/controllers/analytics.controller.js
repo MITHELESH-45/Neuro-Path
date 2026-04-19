@@ -43,7 +43,14 @@ const getAnalytics = async (req, res) => {
         id: msg._id,
         date: msg.createdAt,
         task: userMsg ? userMsg.text : 'Unknown Task',
-        data: msg.text
+        data: msg.text,
+        metadata: msg.metadata || null,
+        recovery: msg.metadata?.recovery || {
+          engine: 'N/A',
+          retries: 0,
+          visionUsed: false,
+          captchaDetected: false
+        }
       };
     }));
 

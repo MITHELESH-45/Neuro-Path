@@ -18,6 +18,8 @@ const ChatPage = () => {
   const [sessions, setSessions] = useState<{_id: string, title: string}[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [activePlan, setActivePlan] = useState<any>(null);
+  const [checkpoints, setCheckpoints] = useState<{type: string, image: string}[]>([]);
 
   useEffect(() => {
     const fetchSessions = async () => {
@@ -44,6 +46,16 @@ const ChatPage = () => {
       setLogs((prev) => [...prev, `> [AGENT] ✨ ${data.data}`]);
     });
 
+    socket.on('agent_plan', (data) => {
+      setActivePlan(data);
+      setLogs((prev) => [...prev, `[PLANNER] Intent Identified: ${data.intent}`]);
+    });
+
+    socket.on('agent_checkpoint', (data) => {
+      setCheckpoints((prev) => [...prev, data]);
+      setLogs((prev) => [...prev, `📸 Checkpoint captured: ${data.type}`]);
+    });
+
     socket.on('agent_error', (data) => {
       setStatus('error');
       setLogs((prev) => [...prev, `[ERROR] ❌ Failed: ${data.error}`]);
@@ -58,11 +70,15 @@ const ChatPage = () => {
     setActiveSessionId(null);
     setLogs([]);
     setStatus('idle');
+    setActivePlan(null);
+    setCheckpoints([]);
   };
 
   const loadSession = async (sessionId: string) => {
     setActiveSessionId(sessionId);
     setLogs([]);
+    setActivePlan(null);
+    setCheckpoints([]);
     try {
       const token = getCookie('token');
       const res = await axios.get(`http://localhost:5000/api/chats/${sessionId}/messages`, {
@@ -72,6 +88,12 @@ const ChatPage = () => {
         m.sender === 'user' ? `> [USER] ${m.text}` : `> [AGENT] ✨ ${m.text}`
       );
       setLogs(formattedLogs);
+      
+      // Restore the latest plan if it exists
+      const lastAgentMessage = [...res.data].reverse().find((m: any) => m.sender === 'agent' && m.metadata);
+      if (lastAgentMessage) {
+        setActivePlan(lastAgentMessage.metadata);
+      }
     } catch (err) {
       console.error('Failed to load messages', err);
     }
@@ -99,11 +121,24 @@ const ChatPage = () => {
     }
 
     setLogs((prev) => [...prev, `> Planner Init: analyzing "${message}"`]);
+    setActivePlan(null);
+    setCheckpoints([]);
     const socket = socketService.getSocket();
     if (socket) {
       socket.emit('start_agent_task', { prompt: message, sessionId: currentSessionId });
     }
     setMessage('');
+  };
+
+  const renderLogText = (log: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = log.split(urlRegex);
+    return parts.map((part, i) => {
+      if (part.match(urlRegex)) {
+         return <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="underline font-bold text-blue-600 hover:text-blue-800 dark:text-red-400 dark:hover:text-red-300 transition-colors ml-1">{part}</a>
+      }
+      return <span key={i}>{part}</span>;
+    });
   };
 
   return (
@@ -187,15 +222,63 @@ const ChatPage = () => {
           </div>
         </header>
 
+        {/* Intent Tracker Card */}
+        {activePlan && (
+          <div className="bg-white dark:bg-[#0a0a0a] border-b border-slate-200 dark:border-red-900/50 p-4 shrink-0 transition-colors shadow-sm z-10">
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-3 flex items-center">
+              <Bot className="w-4 h-4 mr-2 text-blue-500 dark:text-red-500" />
+              Dynamic Execution Plan
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
+              <div className="space-y-1">
+                <p className="text-slate-500 dark:text-zinc-500">Detected Intent:</p>
+                <p className="text-blue-600 dark:text-red-400 font-medium">{activePlan.intent}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-slate-500 dark:text-zinc-500">Discovery Goal:</p>
+                <p className="text-slate-800 dark:text-slate-300 truncate" title={activePlan.goal}>{activePlan.goal}</p>
+              </div>
+            </div>
+            <div className="mt-4">
+               <p className="text-slate-500 dark:text-zinc-500 text-[10px] uppercase mb-2 font-bold tracking-wider">Generated Discovery Queries:</p>
+               <div className="flex flex-wrap gap-2">
+                 {activePlan.searchQueries?.map((q: string, i: number) => (
+                    <span key={i} className="px-2.5 py-1 bg-slate-100 dark:bg-zinc-900 rounded-lg text-slate-700 dark:text-zinc-300 text-xs border border-slate-200 dark:border-zinc-800">{q}</span>
+                 ))}
+               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Live Observation Strip */}
+        {checkpoints.length > 0 && (
+          <div className="bg-slate-50 dark:bg-zinc-950 border-b border-slate-200 dark:border-zinc-800 p-3 h-32 flex-shrink-0 z-10">
+             <div className="flex items-center space-x-2 mb-2">
+                <Activity className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-bold dark:text-zinc-400 uppercase tracking-widest">Live Agent Observation</span>
+             </div>
+             <div className="flex space-x-3 overflow-x-auto custom-scrollbar pb-2 h-full">
+                {checkpoints.map((cp, idx) => (
+                   <div key={idx} className="relative group flex-shrink-0 h-20 w-32 rounded-lg overflow-hidden border border-slate-200 dark:border-zinc-800 bg-black shadow-sm">
+                      <img src={`data:image/jpeg;base64,${cp.image}`} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt={cp.type} />
+                      <div className="absolute inset-x-0 bottom-0 bg-black/60 p-1">
+                         <p className="text-[8px] text-white truncate text-center uppercase tracking-tighter">{cp.type.replace(/_/g, ' ')}</p>
+                      </div>
+                   </div>
+                ))}
+             </div>
+          </div>
+        )}
+
         {/* Console / Logs */}
         <main className="flex-grow overflow-y-auto p-4 md:p-6 space-y-4 font-mono text-sm custom-scrollbar bg-slate-50 dark:bg-black transition-colors duration-300">
           {logs.map((log, i) => (
-            <div key={i} className={`p-3 rounded-lg border ${
+            <div key={i} className={`p-3 rounded-lg border whitespace-pre-wrap leading-relaxed ${
               log.startsWith('>') 
-                ? 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-transparent dark:border-red-900/50 dark:text-red-400' 
-                : 'bg-white border-slate-200 text-slate-600 dark:bg-zinc-900/50 dark:border-zinc-800 dark:text-zinc-400'
+                ? 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-zinc-900/40 dark:border-red-900/30 dark:text-slate-200' 
+                : 'bg-white border-slate-200 text-slate-600 dark:bg-[#0f0f0f] dark:border-zinc-800 dark:text-zinc-400'
             }`}>
-              {log}
+              {renderLogText(log)}
             </div>
           ))}
           {logs.length === 0 && (

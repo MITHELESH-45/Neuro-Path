@@ -13,6 +13,7 @@ function getCookie(name: string) {
 const DashboardPage = () => {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedMetadata, setSelectedMetadata] = useState<any>(null);
 
   const fetchAnalytics = async () => {
     setLoading(true);
@@ -94,12 +95,20 @@ const DashboardPage = () => {
                       <tr className="border-b border-slate-200 dark:border-zinc-800 text-sm text-slate-500 dark:text-zinc-400">
                         <th className="pb-3 px-2 font-medium">Date</th>
                         <th className="pb-3 px-2 font-medium">Task / Target URL</th>
-                        <th className="pb-3 px-2 font-medium">Extracted Data</th>
+                        <th className="pb-3 px-2 font-medium">Engine</th>
+                        <th className="pb-3 px-2 font-medium text-center">Retries</th>
+                        <th className="pb-3 px-2 font-medium text-center">Vision</th>
+                        <th className="pb-3 px-2 font-medium text-center">CAPTCHA</th>
+                        <th className="pb-3 px-2 font-medium">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/50">
                       {data.recentExtractions.map((item: any) => (
-                        <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-zinc-900/40 transition-colors group">
+                        <tr 
+                          key={item.id} 
+                          className={`group transition-colors ${item.metadata ? 'cursor-pointer hover:bg-slate-50 dark:hover:bg-zinc-900/40' : 'hover:bg-slate-50 dark:hover:bg-zinc-900/40'}`}
+                          onClick={() => item.metadata && setSelectedMetadata(item.metadata)}
+                        >
                           <td className="py-4 px-2 whitespace-nowrap text-sm text-slate-500 dark:text-zinc-500">
                             {new Date(item.date).toLocaleDateString()} <br/>
                             <span className="text-xs">{new Date(item.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
@@ -113,11 +122,35 @@ const DashboardPage = () => {
                             </div>
                           </td>
                           <td className="py-4 px-2">
-                            <div className="max-w-md p-3 bg-slate-50 border border-slate-200 dark:bg-black/40 dark:border-red-900/30 rounded-lg">
-                              <p className="text-sm font-mono text-blue-800 dark:text-red-400 line-clamp-3" title={item.data}>
-                                {item.data}
-                              </p>
+                            <div className="flex items-center space-x-2">
+                               <span className="px-2 py-0.5 bg-slate-100 dark:bg-zinc-800 rounded text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
+                                 {item.recovery?.engine || 'N/A'}
+                               </span>
                             </div>
+                          </td>
+                          <td className="py-4 px-2 text-center text-sm font-mono dark:text-zinc-300">
+                            {item.recovery?.retries || 0}
+                          </td>
+                          <td className="py-4 px-2 text-center">
+                            {item.recovery?.visionUsed ? 
+                              <span className="text-blue-500 text-xs font-bold">YES</span> : 
+                              <span className="text-slate-300 dark:text-zinc-700 text-xs text-center">—</span>
+                            }
+                          </td>
+                          <td className="py-4 px-2 text-center">
+                            {item.recovery?.captchaDetected ? 
+                              <span className="text-orange-500 text-xs font-bold">DET</span> : 
+                              <span className="text-slate-300 dark:text-zinc-700 text-xs text-center">—</span>
+                            }
+                          </td>
+                          <td className="py-4 px-2 whitespace-nowrap">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                               item.data.startsWith('Error') 
+                               ? 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400' 
+                               : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
+                            }`}>
+                              {item.data.startsWith('Error') ? 'FAILED' : 'SUCCESS'}
+                            </span>
                           </td>
                         </tr>
                       ))}
@@ -136,6 +169,52 @@ const DashboardPage = () => {
 
         </div>
       </div>
+
+      {/* Metadata Detail Modal */}
+      {selectedMetadata && (
+        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 transition-opacity">
+          <div className="bg-white dark:bg-black border border-slate-200 dark:border-red-900/50 rounded-2xl shadow-2xl p-6 w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4 flex-shrink-0">
+               <div>
+                  <h3 className="text-xl font-bold dark:text-white flex items-center">
+                    <Activity className="w-5 h-5 mr-2 text-blue-500 dark:text-red-500" /> 
+                    Execution Plan Metadata
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">The structured reasoning tree utilized by the Agent to fulfill this task.</p>
+               </div>
+              <button 
+                onClick={() => setSelectedMetadata(null)} 
+                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors"
+               >
+                Close
+              </button>
+            </div>
+            <div className="flex-grow overflow-y-auto custom-scrollbar space-y-6">
+              {selectedMetadata.recovery && (
+                <div className="p-4 bg-slate-50 dark:bg-zinc-950 rounded-xl border border-slate-200 dark:border-red-900/20">
+                  <h4 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-3">Recovery Timeline</h4>
+                  <div className="space-y-2">
+                    {selectedMetadata.recovery.timeline?.map((event: string, i: number) => (
+                      <div key={i} className="flex items-start space-x-3 text-xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1 flex-shrink-0" />
+                        <p className="dark:text-slate-300 font-mono italic">{event}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              <div>
+                <h4 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-3 px-1">Full Internal Plan</h4>
+                <pre className="text-[10px] font-mono bg-slate-50 border border-slate-200 shadow-inner dark:bg-zinc-950 dark:border-red-900/30 p-4 rounded-xl text-blue-800 dark:text-red-400 overflow-x-auto whitespace-pre-wrap">
+                  {JSON.stringify(selectedMetadata.planner || selectedMetadata, null, 2)}
+                </pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
