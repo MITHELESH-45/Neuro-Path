@@ -7,6 +7,7 @@ const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const connectDB = require('./config/db');
 const authRoutes = require('./routes/auth.routes');
+const chatRoutes = require('./routes/chat.routes');
 const User = require('./models/User');
 
 const app = express();
@@ -58,6 +59,22 @@ passport.use(new GoogleStrategy({
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/chats', chatRoutes);
+
+app.get('/api/test-agent', async (req, res) => {
+  try {
+    const agentService = require('./services/agentService');
+    const defaultPrompt = "Go to https://news.ycombinator.com/ and tell me the exact title of the top ranking article.";
+    const result = await agentService.runAgentTask(null, defaultPrompt, null);
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(500).json(result);
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 app.get('/', (req, res) => {
   res.send('Neuro-Path API is running...');
@@ -70,6 +87,11 @@ io.on('connection', (socket) => {
   socket.on('start_task', async (data) => {
     const agentService = require('./services/agentService');
     await agentService.runTask(data.task, socket);
+  });
+
+  socket.on('start_agent_task', async (data) => {
+    const agentService = require('./services/agentService');
+    await agentService.runAgentTask(socket, data?.prompt, data?.sessionId);
   });
 
   socket.on('disconnect', () => {

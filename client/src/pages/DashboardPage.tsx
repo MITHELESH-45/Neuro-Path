@@ -1,6 +1,6 @@
 import React from 'react';
 import { Activity, Globe, Cpu, Zap, RotateCcw, Play, Pause } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
+import Navbar from '../components/Navbar';
 
 const DashboardPage = () => {
   const stats = [
@@ -18,9 +18,9 @@ const DashboardPage = () => {
   ];
 
   return (
-    <div className="flex flex-col md:flex-row h-screen bg-slate-50 dark:bg-black overflow-hidden transition-colors duration-300">
-      <Sidebar />
-      <div className="flex-grow overflow-y-auto pb-20 md:pb-0">
+    <div className="flex flex-col h-screen bg-slate-50 dark:bg-black overflow-hidden transition-colors duration-300">
+      <Navbar />
+      <div className="flex-grow overflow-y-auto w-full">
         <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
       <header className="flex flex-col md:flex-row md:items-center justify-between space-y-4 md:space-y-0">
         <div>
