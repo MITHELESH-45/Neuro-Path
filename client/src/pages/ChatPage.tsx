@@ -41,7 +41,7 @@ const ChatPage = () => {
 
     socket.on('agent_complete', (data) => {
       setStatus('idle');
-      setLogs((prev) => [...prev, `[SUCCESS] ✨ Final Data: ${data.data}`]);
+      setLogs((prev) => [...prev, `> [AGENT] ✨ ${data.data}`]);
     });
 
     socket.on('agent_error', (data) => {
@@ -69,7 +69,7 @@ const ChatPage = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       const formattedLogs = res.data.map((m: any) => 
-        m.sender === 'user' ? `> [USER] ${m.text}` : `[SUCCESS] ✨ Final Data: ${m.text}`
+        m.sender === 'user' ? `> [USER] ${m.text}` : `> [AGENT] ✨ ${m.text}`
       );
       setLogs(formattedLogs);
     } catch (err) {

@@ -60,6 +60,7 @@ passport.use(new GoogleStrategy({
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/chats', chatRoutes);
+app.use('/api/analytics', require('./routes/analytics.routes'));
 
 app.get('/api/test-agent', async (req, res) => {
   try {
